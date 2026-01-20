@@ -1,7 +1,13 @@
 {
-  "name": "Copy of GeoGemini Chat",
-  "description": "An interactive map-based chatbot that combines Gemini's reasoning with real-time Google Maps and Search grounding for location-specific insights.",
+  "name": "ЗОДЧИЙ: Управление строительством",
+  "short_name": "ЗОДЧИЙ",
+  "description": "Профессиональное управление строительными объектами. Фотоотчеты и технадзор.",
   "requestFramePermissions": [
+    "camera",
     "geolocation"
-  ]
+  ],
+  "display": "standalone",
+  "start_url": "/",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff"
 }

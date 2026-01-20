@@ -1,0 +1,79 @@
+
+import React from 'react';
+import { Task, TaskStatus, UserRole, TASK_STATUS_LABELS } from '../types.ts';
+import { 
+  Camera, 
+  Play, 
+  RotateCcw, 
+  Check, 
+  ShieldCheck,
+  MessageSquare,
+  Files,
+  ChevronRight
+} from 'lucide-react';
+
+interface TaskCardProps {
+  task: Task;
+  role: UserRole;
+  isAdmin?: boolean;
+  onStatusChange: (newStatus: TaskStatus, evidence?: File, comment?: string) => void;
+  onAddComment: (text: string) => void;
+}
+
+const TaskCard: React.FC<TaskCardProps> = ({ task, role, isAdmin = false }) => {
+  const statusColors: Record<TaskStatus, string> = {
+    [TaskStatus.TODO]: 'bg-slate-100 text-slate-700 border-slate-200',
+    [TaskStatus.IN_PROGRESS]: 'bg-blue-50 text-blue-700 border-blue-200',
+    [TaskStatus.REVIEW]: 'bg-amber-50 text-amber-700 border-amber-200',
+    [TaskStatus.DONE]: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    [TaskStatus.REWORK]: 'bg-rose-50 text-rose-700 border-rose-200',
+  };
+
+  const evidenceList = task.evidenceUrls || [];
+  const commentsList = task.comments || [];
+  
+  return (
+    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 mb-3 transition-all active:scale-[0.98] cursor-pointer hover:border-blue-200 group relative">
+      {isAdmin && (
+        <div className="absolute top-0 right-0 p-1.5 bg-blue-600 text-white rounded-bl-xl shadow-sm z-10">
+          <ShieldCheck size={14} />
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mb-4">
+        <span className={`text-[9px] uppercase font-black px-3 py-1.5 rounded-lg border ${statusColors[task.status]}`}>
+          {TASK_STATUS_LABELS[task.status]}
+        </span>
+        <div className="flex gap-2">
+          {evidenceList.length > 0 && (
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg">
+              <Files size={12} /> {evidenceList.length}
+            </div>
+          )}
+          {commentsList.length > 0 && (
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg">
+              <MessageSquare size={12} /> {commentsList.length}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-start justify-between gap-5">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-black text-slate-800 mb-1.5 leading-tight tracking-tight truncate group-hover:text-blue-600 transition-colors">{task.title}</h3>
+          <p className="text-slate-500 text-[11px] leading-relaxed font-medium line-clamp-1">{task.description}</p>
+        </div>
+        <ChevronRight size={24} className="text-slate-200 group-hover:text-blue-600 group-hover:translate-x-1.5 transition-all mt-1" />
+      </div>
+
+      {task.status === TaskStatus.REWORK && (
+        <div className="mt-4 bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-3">
+           <RotateCcw size={14} className="text-rose-500 shrink-0" />
+           <span className="text-[10px] font-bold text-rose-700 truncate">{task.supervisorComment || 'Замечание технадзора'}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TaskCard;

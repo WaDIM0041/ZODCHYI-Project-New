@@ -1,24 +1,138 @@
 
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  groundingLinks?: GroundingLink[];
-  suggestedLocation?: {
-    lat: number;
-    lng: number;
-    title?: string;
-  };
+export enum UserRole {
+  ADMIN = 'admin',
+  MANAGER = 'manager',
+  FOREMAN = 'foreman',
+  SUPERVISOR = 'supervisor'
 }
 
-export interface GroundingLink {
+export enum TaskStatus {
+  TODO = 'todo',
+  IN_PROGRESS = 'in_progress',
+  REVIEW = 'review',
+  DONE = 'done',
+  REWORK = 'rework'
+}
+
+export enum FileCategory {
+  DOCUMENT = 'document',
+  DRAWING = 'drawing',
+  PHOTO = 'photo'
+}
+
+export enum ProjectStatus {
+  NEW = 'new',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed'
+}
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'Администратор',
+  [UserRole.MANAGER]: 'Менеджер',
+  [UserRole.FOREMAN]: 'Прораб',
+  [UserRole.SUPERVISOR]: 'Технадзор',
+};
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  [TaskStatus.TODO]: 'Новая',
+  [TaskStatus.IN_PROGRESS]: 'В работе',
+  [TaskStatus.REVIEW]: 'На проверке',
+  [TaskStatus.DONE]: 'Завершено',
+  [TaskStatus.REWORK]: 'Доработка',
+};
+
+export interface Comment {
+  id: number;
+  author: string;
+  role: UserRole;
+  text: string;
+  createdAt: string;
+}
+
+export interface GlobalChatMessage {
+  id: number;
+  userId: number;
+  username: string;
+  role: UserRole;
+  text: string;
+  createdAt: string;
+}
+
+export interface User {
+  id: number;
+  username: string;
+  role: UserRole;
+  password?: string;
+  lastActive?: string;
+}
+
+export interface ProjectFile {
+  name: string;
+  url: string;
+  category: FileCategory;
+  createdAt: string;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  description?: string;
+  clientFullName: string;
+  city: string;
+  street: string;
+  phone: string;
+  telegram: string;
+  address: string;
+  geoLocation: { lat: number; lon: number; };
+  fileLinks: ProjectFile[];
+  progress: number;
+  status: ProjectStatus;
+  comments?: Comment[];
+}
+
+export interface AIAnalysisResult {
+  status: 'passed' | 'warning' | 'failed';
+  feedback: string;
+  detectedIssues: string[];
+  timestamp: string;
+}
+
+export interface Task {
+  id: number;
+  projectId: number;
   title: string;
-  uri: string;
-  type: 'search' | 'maps';
+  description: string;
+  status: TaskStatus;
+  foremanComment?: string;
+  supervisorComment?: string;
+  evidenceUrls: string[]; 
+  evidenceCount: number;
+  comments?: Comment[];
+  aiAnalysis?: AIAnalysisResult;
 }
 
-export interface UserLocation {
-  lat: number;
-  lng: number;
+export interface AppNotification {
+  id: number;
+  taskId: number;
+  projectTitle: string;
+  taskTitle: string;
+  message: string;
+  targetRole: UserRole;
+  isRead: boolean;
+  createdAt: string;
+  type: 'review' | 'rework' | 'done' | 'comment' | 'ai_alert';
+}
+
+export interface BackupEntry {
+  id: string;
+  createdAt: string;
+  size: string;
+  status: 'success' | 'error';
+  createdBy: string;
+}
+
+export interface GithubConfig {
+  token: string;
+  repo: string; 
+  path: string; 
 }
