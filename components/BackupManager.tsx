@@ -1,10 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, Github, Settings2, Globe, Lock, CloudDownload, CloudUpload, Copy, Key, Check, AlertCircle } from 'lucide-react';
+import { Database, Github, Settings2, Globe, Lock, CloudDownload, CloudUpload, Copy, Key, Check, AlertCircle, RefreshCw, ShieldCheck, ShieldAlert, Share2, QrCode, ExternalLink, X } from 'lucide-react';
 import { User, GithubConfig } from '../types.ts';
 import { STORAGE_KEYS } from '../App.tsx';
-
-const GH_CONFIG_KEY = 'stroy_sync_gh_config_v4';
 
 interface BackupManagerProps {
   currentUser?: User | null;
@@ -14,18 +12,22 @@ interface BackupManagerProps {
 export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, onDataImport }) => {
   const [ghConfig, setGhConfig] = useState<GithubConfig>(() => {
     try {
-      const saved = localStorage.getItem(GH_CONFIG_KEY);
+      const saved = localStorage.getItem(STORAGE_KEYS.GH_CONFIG);
       return saved ? JSON.parse(saved) : { token: '', repo: '', path: 'zodchiy_backup.json' };
     } catch { return { token: '', repo: '', path: 'zodchiy_backup.json' }; }
   });
   
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncKey, setSyncKey] = useState('');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(ghConfig));
+    localStorage.setItem(STORAGE_KEYS.GH_CONFIG, JSON.stringify(ghConfig));
+    if (ghConfig.token && ghConfig.repo) {
+       setSyncStatus('idle');
+    }
   }, [ghConfig]);
 
   const toBase64 = (str: string) => {
@@ -36,82 +38,86 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, onDat
 
   const fromBase64 = (str: string) => {
     try {
-      return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => {
+      const cleanStr = str.replace(/\s/g, '');
+      return decodeURIComponent(Array.prototype.map.call(atob(cleanStr), (c) => {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
       }).join(''));
-    } catch { return ''; }
+    } catch (e) { 
+      return ''; 
+    }
   };
 
-  // Генерация единого ключа на основе настроек
-  const generateSyncKey = () => {
-    if (!ghConfig.token || !ghConfig.repo) return '';
-    return toBase64(JSON.stringify(ghConfig));
+  const generateInviteLink = () => {
+    const configStr = JSON.stringify(ghConfig);
+    const base64 = btoa(configStr);
+    const url = new URL(window.location.origin);
+    url.searchParams.set('config', base64);
+    return url.toString();
   };
 
-  // Импорт настроек из ключа
-  const handleImportSyncKey = () => {
-    if (!syncKey.trim()) return;
-    const decoded = fromBase64(syncKey.trim());
-    if (decoded) {
-      try {
-        const config = JSON.parse(decoded);
-        if (config.token && config.repo) {
-          setGhConfig(config);
-          setSyncKey('');
-          alert("Ключ синхронизации успешно применен!");
-        }
-      } catch { alert("Неверный формат ключа"); }
-    } else { alert("Ошибка декодирования ключа"); }
-  };
-
-  const handleCopyKey = () => {
-    const key = generateSyncKey();
-    if (!key) {
-      alert("Сначала заполните настройки GitHub в расширенном режиме");
+  const handleShareLink = () => {
+    if (!ghConfig.token || !ghConfig.repo) {
+      alert("Сначала настройте подключение в расширенных настройках");
       setShowAdvanced(true);
       return;
     }
-    navigator.clipboard.writeText(key);
+    const link = generateInviteLink();
+    navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    alert("Ссылка-приглашение скопирована! Отправьте её коллеге.");
+  };
+
+  const testConnection = async () => {
+    if (!ghConfig.token || !ghConfig.repo) return;
+    setSyncStatus('testing');
+    try {
+      const url = `https://api.github.com/repos/${ghConfig.repo}`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${ghConfig.token.trim()}` }
+      });
+      setSyncStatus(response.ok ? 'valid' : 'invalid');
+    } catch {
+      setSyncStatus('invalid');
+    }
   };
 
   const handlePullFromGithub = async () => {
-    if (!ghConfig.token || !ghConfig.repo) {
-      alert("Настройте доступ (используйте ключ или ручной ввод)");
-      return;
-    }
-
+    if (!ghConfig.token || !ghConfig.repo) return;
     setIsSyncing(true);
     try {
       const url = `https://api.github.com/repos/${ghConfig.repo}/contents/${ghConfig.path}`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${ghConfig.token.trim()}`, 'Accept': 'application/vnd.github.v3+json' }
+        headers: { 
+          'Authorization': `Bearer ${ghConfig.token.trim()}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Cache-Control': 'no-cache'
+        }
       });
 
       if (response.ok) {
         const data = await response.json();
-        const content = JSON.parse(fromBase64(data.content));
+        const rawContent = fromBase64(data.content);
+        if (!rawContent) throw new Error("Ошибка чтения данных");
+        const content = JSON.parse(rawContent);
         if (onDataImport) {
           onDataImport(content);
-          alert("Данные успешно загружены из облака!");
+          setSyncStatus('valid');
+          alert("Данные успешно синхронизированы!");
         }
       } else {
-        throw new Error("Файл не найден. Сохраните данные сначала.");
+        throw new Error(response.status === 404 ? "Файл не найден" : "Ошибка доступа");
       }
     } catch (error: any) {
-      alert(`Ошибка: ${error.message}`);
+      alert(`Синхронизация не удалась: ${error.message}`);
+      setSyncStatus('invalid');
     } finally {
       setIsSyncing(false);
     }
   };
 
   const handleSaveToGithub = async () => {
-    if (!ghConfig.token || !ghConfig.repo) {
-      alert("Настройте доступ к GitHub");
-      return;
-    }
-
+    if (!ghConfig.token || !ghConfig.repo) return;
     setIsSyncing(true);
     try {
       const appData = {
@@ -123,10 +129,14 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, onDat
 
       const content = toBase64(JSON.stringify(appData, null, 2));
       const url = `https://api.github.com/repos/${ghConfig.repo}/contents/${ghConfig.path}`;
-      const headers = { 'Authorization': `Bearer ${ghConfig.token.trim()}`, 'Content-Type': 'application/json' };
+      const headers = { 
+        'Authorization': `Bearer ${ghConfig.token.trim()}`, 
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      };
       
       let sha = '';
-      const getFile = await fetch(url, { headers });
+      const getFile = await fetch(url, { headers, cache: 'no-store' });
       if (getFile.ok) {
         const fileData = await getFile.json();
         sha = fileData.sha;
@@ -136,143 +146,196 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, onDat
         method: 'PUT',
         headers,
         body: JSON.stringify({
-          message: `Sync from Zodchiy Mobile`,
+          message: `Update from Zodchiy Mobile [${new Date().toLocaleString()}]`,
           content,
           sha: sha || undefined
         })
       });
 
       if (response.ok) {
-        alert("Данные успешно сохранены в облако!");
+        setSyncStatus('valid');
+        alert("Облако обновлено!");
       } else {
         const err = await response.json();
         throw new Error(err.message);
       }
     } catch (error: any) {
-      alert(`Ошибка сохранения: ${error.message}`);
+      alert(`Ошибка: ${error.message}`);
+      setSyncStatus('invalid');
     } finally {
       setIsSyncing(false);
     }
   };
 
+  const openQR = () => {
+    if (!ghConfig.token || !ghConfig.repo) {
+      alert("Сначала настройте подключение в расширенных настройках");
+      setShowAdvanced(true);
+      return;
+    }
+    setShowQRModal(true);
+  };
+
   return (
-    <div className="space-y-6 pb-24 px-2 animate-in fade-in">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-950 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden border border-white/5">
+    <div className="space-y-4 pb-24 px-1 animate-in fade-in relative">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-white/5">
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">
-              <Database size={24} />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-600 rounded-xl">
+                <Database size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-tight leading-none">Облако</h2>
+                <div className="flex items-center gap-1.5 mt-1">
+                   {syncStatus === 'valid' ? (
+                     <span className="flex items-center gap-1 text-[8px] font-black text-emerald-400 uppercase tracking-widest"><ShieldCheck size={10}/> Активно</span>
+                   ) : (
+                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Готов к работе</span>
+                   )}
+                </div>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-black uppercase tracking-tight leading-none">Облако</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Синхронизация объектов</p>
-            </div>
+            {ghConfig.token && (
+              <button onClick={testConnection} className="p-2 bg-white/5 rounded-lg text-slate-400 active:rotate-180 transition-all">
+                <RefreshCw size={16} className={syncStatus === 'testing' ? 'animate-spin' : ''} />
+              </button>
+            )}
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button 
+                onClick={handlePullFromGithub}
+                disabled={isSyncing}
+                className="flex-1 bg-white/5 backdrop-blur-md text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
+              >
+                <CloudDownload size={18} /> Загрузить
+              </button>
+              <button 
+                onClick={handleSaveToGithub}
+                disabled={isSyncing}
+                className="flex-1 bg-blue-600 text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                <CloudUpload size={18} /> Сохранить
+              </button>
+            </div>
+            
             <button 
-              onClick={handlePullFromGithub}
-              disabled={isSyncing}
-              className="flex-1 bg-white/5 hover:bg-white/10 backdrop-blur-md text-white font-black py-5 rounded-2xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95"
+              onClick={handleShareLink}
+              className="w-full bg-slate-700/50 text-white/80 font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-white/5 active:scale-95 transition-all"
             >
-              <CloudDownload size={20} /> Загрузить
-            </button>
-            <button 
-              onClick={handleSaveToGithub}
-              disabled={isSyncing}
-              className="flex-1 bg-blue-600 text-white font-black py-5 rounded-2xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 transition-all active:scale-95"
-            >
-              <CloudUpload size={20} /> Сохранить
+              <Share2 size={16} /> {copied ? 'Ссылка скопирована' : 'Поделиться доступом с командой'}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm space-y-8">
-        {/* Sync Key Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Key size={14} /> Ключ синхронизации
-            </h4>
-            <button 
-              onClick={handleCopyKey}
-              className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg"
-            >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-              {copied ? 'Скопирован' : 'Мой ключ'}
-            </button>
-          </div>
-          
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={syncKey}
-              onChange={(e) => setSyncKey(e.target.value)}
-              placeholder="Вставьте ключ другого устройства..."
-              className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl py-4 px-5 text-xs font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50"
-            />
-            <button 
-              onClick={handleImportSyncKey}
-              className="bg-slate-800 text-white px-5 rounded-2xl font-black text-[10px] uppercase active:scale-95 transition-all"
-            >
-              Ок
-            </button>
-          </div>
-          <p className="text-[9px] text-slate-400 font-medium px-1 italic">
-            Используйте этот ключ, чтобы мгновенно настроить синхронизацию на новом телефоне без ввода паролей GitHub.
-          </p>
-        </div>
-
-        {/* Advanced Settings */}
-        <div className="pt-6 border-t border-slate-50">
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6">
+        <div className="flex items-center justify-between px-1">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <Settings2 size={12} /> Конфигурация
+          </h4>
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full flex items-center justify-between text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-[9px] font-black text-blue-600 uppercase"
           >
-            <span className="text-[10px] font-black uppercase tracking-widest">Расширенные настройки (GitHub)</span>
-            <Settings2 size={16} className={showAdvanced ? 'rotate-90 transition-transform' : ''} />
+            {showAdvanced ? 'Скрыть' : 'Настроить вручную'}
           </button>
+        </div>
 
-          {showAdvanced && (
-            <div className="mt-6 space-y-4 animate-in slide-in-from-top-2">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Personal Access Token</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                  <input 
-                    type="password" 
-                    value={ghConfig.token}
-                    onChange={e => setGhConfig({...ghConfig, token: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-4 pl-11 pr-4 text-xs font-bold text-slate-700 outline-none"
-                    placeholder="ghp_xxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Репозиторий (user/repo)</label>
-                <div className="relative">
-                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                  <input 
-                    type="text" 
-                    value={ghConfig.repo}
-                    onChange={e => setGhConfig({...ghConfig, repo: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-4 pl-11 pr-4 text-xs font-bold text-slate-700 outline-none"
-                    placeholder="name/my-repo"
-                  />
-                </div>
+        {showAdvanced && (
+          <div className="space-y-3 animate-in slide-in-from-top-2">
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-slate-400 uppercase ml-1">GitHub Token (Classic)</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                <input 
+                  type="password" 
+                  value={ghConfig.token}
+                  onChange={e => setGhConfig({...ghConfig, token: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-lg py-3 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                  placeholder="ghp_..."
+                />
               </div>
             </div>
-          )}
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Репозиторий (user/repo)</label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                <input 
+                  type="text" 
+                  value={ghConfig.repo}
+                  onChange={e => setGhConfig({...ghConfig, repo: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-lg py-3 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                  placeholder="ivanov/my-zodchiy-data"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex gap-3">
+          <ShieldCheck className="text-emerald-600 shrink-0" size={20} />
+          <p className="text-[10px] font-bold text-emerald-900 leading-normal">
+            <b>Мастер-настройка:</b> Настройте GitHub один раз, а затем покажите QR-код коллеге для автоматического подключения.
+          </p>
         </div>
       </div>
       
-      <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100 flex gap-4">
-        <AlertCircle className="text-blue-600 shrink-0" size={24} />
-        <p className="text-[11px] font-bold text-blue-900 leading-relaxed">
-          Все данные хранятся в зашифрованном JSON-файле в вашем личном репозитории GitHub. Это гарантирует 100% приватность и владение информацией.
-        </p>
-      </div>
+      <button 
+        onClick={openQR}
+        className="p-5 bg-slate-900 text-white rounded-3xl border border-slate-800 flex items-center justify-between active:scale-95 transition-all w-full shadow-xl"
+      >
+         <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500 rounded-xl">
+              <QrCode size={20} className="text-white" />
+            </div>
+            <span className="text-[11px] font-black uppercase tracking-widest">Показать QR для прорабов</span>
+         </div>
+         <ExternalLink size={18} className="text-slate-500" />
+      </button>
+
+      {/* Модальное окно QR-кода */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center relative shadow-2xl animate-in zoom-in-95">
+            <button 
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-full hover:text-slate-800 transition-colors"
+            >
+              <X size={24} />
+            </button>
+            
+            <div className="mb-6 mt-4">
+               <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-xl mb-4">
+                  <QrCode size={32} />
+               </div>
+               <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Быстрый доступ</h3>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Отсканируйте код другим телефоном</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-3xl border-2 border-slate-50 shadow-inner inline-block mb-6">
+               <img 
+                 src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(generateInviteLink())}`} 
+                 alt="QR Code" 
+                 className="w-56 h-56 rounded-xl"
+               />
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-2xl text-blue-700 text-[10px] font-bold leading-relaxed">
+               Код содержит настройки вашего облака. При сканировании приложение на другом устройстве настроится автоматически.
+            </div>
+
+            <button 
+              onClick={() => setShowQRModal(false)}
+              className="w-full mt-6 bg-slate-800 text-white font-black py-5 rounded-2xl text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

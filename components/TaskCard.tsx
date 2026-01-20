@@ -33,43 +33,43 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, role, isAdmin = false }) => {
   const commentsList = task.comments || [];
   
   return (
-    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 mb-3 transition-all active:scale-[0.98] cursor-pointer hover:border-blue-200 group relative">
+    <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-100 p-4 sm:p-6 mb-3 transition-all active:scale-[0.98] cursor-pointer hover:border-blue-200 group relative overflow-hidden">
       {isAdmin && (
-        <div className="absolute top-0 right-0 p-1.5 bg-blue-600 text-white rounded-bl-xl shadow-sm z-10">
-          <ShieldCheck size={14} />
+        <div className="absolute top-0 right-0 p-1 bg-blue-600 text-white rounded-bl-lg shadow-sm z-10">
+          <ShieldCheck size={12} className="sm:w-3.5 sm:h-3.5" />
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-4">
-        <span className={`text-[9px] uppercase font-black px-3 py-1.5 rounded-lg border ${statusColors[task.status]}`}>
+      <div className="flex justify-between items-center mb-3 sm:mb-4">
+        <span className={`text-[8px] sm:text-[9px] uppercase font-black px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border ${statusColors[task.status]}`}>
           {TASK_STATUS_LABELS[task.status]}
         </span>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2">
           {evidenceList.length > 0 && (
-            <div className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg">
-              <Files size={12} /> {evidenceList.length}
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 sm:py-1.5 rounded-lg">
+              <Files size={10} className="sm:w-3 sm:h-3" /> {evidenceList.length}
             </div>
           )}
           {commentsList.length > 0 && (
-            <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg">
-              <MessageSquare size={12} /> {commentsList.length}
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 sm:py-1.5 rounded-lg">
+              <MessageSquare size={10} className="sm:w-3 sm:h-3" /> {commentsList.length}
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex items-start justify-between gap-5">
+      <div className="flex items-center justify-between gap-3 sm:gap-5">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-black text-slate-800 mb-1.5 leading-tight tracking-tight truncate group-hover:text-blue-600 transition-colors">{task.title}</h3>
-          <p className="text-slate-500 text-[11px] leading-relaxed font-medium line-clamp-1">{task.description}</p>
+          <h3 className="text-sm sm:text-base font-black text-slate-800 mb-0.5 sm:mb-1 leading-tight tracking-tight truncate group-hover:text-blue-600 transition-colors">{task.title}</h3>
+          <p className="text-slate-500 text-[10px] sm:text-[11px] leading-relaxed font-medium line-clamp-1">{task.description}</p>
         </div>
-        <ChevronRight size={24} className="text-slate-200 group-hover:text-blue-600 group-hover:translate-x-1.5 transition-all mt-1" />
+        <ChevronRight size={18} className="text-slate-200 group-hover:text-blue-600 group-hover:translate-x-1.5 transition-all shrink-0" />
       </div>
 
       {task.status === TaskStatus.REWORK && (
-        <div className="mt-4 bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-3">
-           <RotateCcw size={14} className="text-rose-500 shrink-0" />
-           <span className="text-[10px] font-bold text-rose-700 truncate">{task.supervisorComment || 'Замечание технадзора'}</span>
+        <div className="mt-3 bg-rose-50 p-2.5 rounded-xl border border-rose-100 flex items-center gap-2">
+           <RotateCcw size={12} className="text-rose-500 shrink-0 sm:w-3.5 sm:h-3.5" />
+           <span className="text-[9px] font-bold text-rose-700 truncate">{task.supervisorComment || 'Замечание технадзора'}</span>
         </div>
       )}
     </div>
