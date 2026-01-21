@@ -18,7 +18,7 @@ app.add_middleware(
 GLOBAL_DB = {
     "projects": [],
     "tasks": [],
-    "app_version": "1.1.7",
+    "app_version": "1.1.8",
     "last_updated": 0
 }
 

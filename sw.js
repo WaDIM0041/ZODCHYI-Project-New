@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'zodchiy-standard-v1.1.7';
+const CACHE_NAME = 'zodchiy-standard-v1.1.8';
 const ASSETS = [
   '/',
   '/index.html',
@@ -11,7 +11,7 @@ const ASSETS = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(c => {
-      console.log('Caching Zodchiy Standard assets v1.1.7');
+      console.log('Caching Zodchiy Standard assets v1.1.8');
       return c.addAll(ASSETS);
     })
   );
