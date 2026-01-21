@@ -7,9 +7,9 @@
     <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="description" content="ЗОДЧИЙ: Профессиональное управление строительными объектами">
+    <meta name="description" content="ЗОДЧИЙ: Система управления строительством v1.1.1">
     
-    <title>ЗОДЧИЙ Projects</title>
+    <title>ЗОДЧИЙ • v1.1.1</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4333/4333645.png">
@@ -37,6 +37,7 @@
             font-family: 'Inter', sans-serif;
             overscroll-behavior-y: contain;
             background-color: #f8fafc;
+            color: #0f172a;
             margin: 0;
             padding-top: var(--sat);
         }
@@ -67,12 +68,6 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        /* Breakpoints adjustments */
-        @media (max-width: 380px) {
-            .xs\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .xs\:col-span-2 { grid-column: span 2 / span 2; }
-        }
-        /* Fix for iOS Safari height issues */
         .min-h-screen {
             min-height: -webkit-fill-available;
             min-height: 100vh;
@@ -94,6 +89,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- Zodchiy Standard v1.1.1 -->
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

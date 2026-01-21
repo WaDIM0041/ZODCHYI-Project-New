@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Users, Shield, UserPlus, Activity, X, Trash2, Pencil, Lock, Eye, Monitor, Check, User as UserIcon } from 'lucide-react';
 import { User, UserRole } from '../types.ts';
@@ -75,12 +74,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right-10 duration-500 pb-20">
-      <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm border-l-4 border-l-amber-500">
+      <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm border-l-4 border-l-amber-500 text-left">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Monitor size={20} /></div>
           <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none text-left">Режим симуляции</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5 text-left">Просмотр интерфейса под другими ролями</p>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Режим симуляции</h3>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1.5">Просмотр интерфейса под другими ролями</p>
           </div>
         </div>
         
@@ -94,8 +93,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 onClick={() => onRoleSwitch(role)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
                   isActive 
-                    ? 'bg-amber-500 border-amber-500 text-slate-100 shadow-xl shadow-amber-100' 
-                    : 'bg-white border-slate-100 text-slate-400 hover:border-amber-200 hover:text-amber-600'
+                    ? 'bg-amber-500 border-amber-500 text-white shadow-xl shadow-amber-100' 
+                    : 'bg-white border-slate-100 text-slate-500 hover:border-amber-200 hover:text-amber-600'
                 }`}
               >
                 <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : 'bg-slate-50'}`}>
@@ -114,7 +113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {showForm && (
         <div className="bg-white rounded-[2.5rem] p-8 border-2 border-blue-500 shadow-2xl animate-in slide-in-from-top-4 duration-300">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter text-left">
               {modalMode === 'create' ? 'Регистрация персонала' : 'Редактирование данных'}
             </h3>
             <button onClick={() => setShowForm(false)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-800 transition-colors">
@@ -125,7 +124,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <form onSubmit={handleSubmit} className="space-y-6 text-left">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                   <UserIcon size={12} /> Логин
                 </label>
                 <input 
@@ -137,7 +136,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                   <Lock size={12} /> Пароль
                 </label>
                 <input 
@@ -152,7 +151,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Роль в системе</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Роль в системе</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {Object.entries(ROLE_LABELS).map(([value, label]) => (
                   <button 
@@ -161,7 +160,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onClick={() => setUserForm({...userForm, role: value as UserRole})} 
                     className={`p-4 rounded-2xl border transition-all text-[10px] font-black uppercase flex flex-col items-center gap-2 ${
                       userForm.role === value 
-                        ? 'bg-blue-600 text-slate-100 border-blue-600 shadow-xl' 
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xl' 
                         : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'
                     }`}
                   >
@@ -182,7 +181,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
               <button 
                 type="submit" 
-                className="flex-[2] bg-blue-600 text-slate-100 font-black py-5 rounded-[1.5rem] uppercase tracking-widest text-[10px] shadow-2xl hover:bg-blue-700 active:scale-[0.98] transition-all"
+                className="flex-[2] bg-blue-600 text-white font-black py-5 rounded-[1.5rem] uppercase tracking-widest text-[10px] shadow-2xl hover:bg-blue-700 active:scale-[0.98] transition-all"
               >
                 {modalMode === 'create' ? 'Добавить в штат' : 'Сохранить изменения'}
               </button>
@@ -191,14 +190,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden text-left">
         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-          <div className="text-left">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Реестр персонала</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-2">Всего сотрудников: {users.length}</p>
+          <div>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Реестр персонала</h3>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-2">Всего сотрудников: {users.length}</p>
           </div>
           {!showForm && (
-            <button onClick={handleOpenCreate} className="bg-blue-600 text-slate-100 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2">
+            <button onClick={handleOpenCreate} className="bg-blue-600 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2">
               <UserPlus size={16} /> Добавить
             </button>
           )}
@@ -218,14 +217,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-black text-slate-800 text-base">{user.username}</h4>
-                    {user.id === currentUser.id && <span className="bg-blue-600 text-slate-100 text-[7px] px-1.5 py-0.5 rounded-full uppercase font-black">Вы</span>}
+                    <h4 className="font-black text-slate-900 text-base">{user.username}</h4>
+                    {user.id === currentUser.id && <span className="bg-blue-600 text-white text-[7px] px-1.5 py-0.5 rounded-full uppercase font-black">Вы</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md">
                       {ROLE_LABELS[user.role]}
                     </span>
-                    <span className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter">
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
                       Пароль: {user.password || '123'}
                     </span>
                   </div>

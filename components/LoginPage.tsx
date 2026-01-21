@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Shield, Activity, Users, Eye, Building2, ChevronRight } from 'lucide-react';
-import { User, UserRole, ROLE_LABELS } from '../types.ts';
+import { User, UserRole, ROLE_LABELS, APP_VERSION } from '../types.ts';
 
 interface LoginPageProps {
   users: User[];
@@ -73,7 +73,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
         </div>
 
         <div className="pt-6 sm:pt-8 text-center border-t border-white/5">
-           <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] sm:tracking-[0.4em]">Zodchiy Standard v7.1 • Mobile Ready</p>
+           <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] sm:tracking-[0.4em]">Zodchiy Standard v{APP_VERSION} • Stable Build</p>
         </div>
       </div>
     </div>

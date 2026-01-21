@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'zodchiy-standard-v1';
+const CACHE_NAME = 'zodchiy-standard-v1.1.1';
 const ASSETS = [
   '/',
   '/index.html',
@@ -15,7 +15,7 @@ self.addEventListener('install', (e) => {
       return c.addAll(ASSETS);
     })
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Принудительно устанавливаем новую версию
 });
 
 self.addEventListener('activate', (e) => {
@@ -30,7 +30,9 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Не кэшируем запросы к API для корректной работы синхронизации
   if (e.request.url.includes('/api/')) return;
+  
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/index.html'))

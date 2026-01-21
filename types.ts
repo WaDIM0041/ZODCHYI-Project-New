@@ -1,4 +1,7 @@
 
+export const APP_VERSION = '1.1.1';
+export const STANDARD_NAME = 'Zodchiy Standard baseline';
+
 export enum UserRole {
   ADMIN = 'admin',
   MANAGER = 'manager',
@@ -49,15 +52,6 @@ export interface Comment {
   createdAt: string;
 }
 
-export interface GlobalChatMessage {
-  id: number;
-  userId: number;
-  username: string;
-  role: UserRole;
-  text: string;
-  createdAt: string;
-}
-
 export interface User {
   id: number;
   username: string;
@@ -88,6 +82,7 @@ export interface Project {
   progress: number;
   status: ProjectStatus;
   comments?: Comment[];
+  updatedAt?: string; // Для синхронизации
 }
 
 export interface AIAnalysisResult {
@@ -109,30 +104,47 @@ export interface Task {
   evidenceCount: number;
   comments?: Comment[];
   aiAnalysis?: AIAnalysisResult;
-}
-
-export interface AppNotification {
-  id: number;
-  taskId: number;
-  projectTitle: string;
-  taskTitle: string;
-  message: string;
-  targetRole: UserRole;
-  isRead: boolean;
-  createdAt: string;
-  type: 'review' | 'rework' | 'done' | 'comment' | 'ai_alert';
-}
-
-export interface BackupEntry {
-  id: string;
-  createdAt: string;
-  size: string;
-  status: 'success' | 'error';
-  createdBy: string;
+  updatedAt?: string; // Для синхронизации
 }
 
 export interface GithubConfig {
   token: string;
   repo: string; 
   path: string; 
+}
+
+export interface GlobalChatMessage {
+  id: number;
+  userId: number;
+  username: string;
+  role: UserRole;
+  text: string;
+  createdAt: string;
+}
+
+export interface AppNotification {
+  id: number;
+  type: 'review' | 'rework' | 'done';
+  projectTitle: string;
+  taskTitle: string;
+  message: string;
+  targetRole: UserRole;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface AppSnapshot {
+  version: string;
+  timestamp: string;
+  projects: Project[];
+  tasks: Task[];
+  users: User[];
+  config: GithubConfig;
+}
+
+export interface SyncResponse {
+  projects: Project[];
+  tasks: Task[];
+  appVersion: string;
+  lastUpdated: number;
 }
