@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.2.5';
+export const APP_VERSION = '1.2.6';
 export const STANDARD_NAME = 'Zodchiy Enterprise Core';
 
 export enum UserRole {
@@ -44,7 +44,7 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export interface Comment {
-  id: number;
+  id: string | number;
   author: string;
   role: UserRole;
   text: string;
@@ -136,7 +136,7 @@ export interface AppNotification {
 }
 
 export interface GlobalChatMessage {
-  id: number;
+  id: string | number;
   userId: number;
   username: string;
   role: UserRole;
