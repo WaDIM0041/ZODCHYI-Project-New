@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zodchiy-v1.5.4';
+const CACHE_NAME = 'zodchiy-v1.5.6';
 const ASSETS = [
   '/',
   '/index.html',
