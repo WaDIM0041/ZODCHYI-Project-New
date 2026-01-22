@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.7';
+export const APP_VERSION = '1.3.9';
 export const STANDARD_NAME = 'Zodchiy Enterprise Core';
 
 export enum UserRole {
@@ -29,11 +29,19 @@ export enum ProjectStatus {
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  [UserRole.ADMIN]: 'Администратор',
-  [UserRole.MANAGER]: 'Менеджер',
-  [UserRole.FOREMAN]: 'Прораб',
+  [UserRole.ADMIN]: 'Генеральный Зодчий',
+  [UserRole.MANAGER]: 'Менеджер проектов',
+  [UserRole.FOREMAN]: 'Прораб участка',
   [UserRole.SUPERVISOR]: 'Технадзор',
 };
+
+export interface InvitePayload {
+  token: string;
+  repo: string;
+  path: string;
+  role: UserRole;
+  username: string;
+}
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   [TaskStatus.TODO]: 'Новая',

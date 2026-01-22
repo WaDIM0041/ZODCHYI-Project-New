@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   UserRole, Task, TaskStatus, Project, User, ProjectStatus, 
-  ROLE_LABELS, Comment, APP_VERSION, AppNotification, GlobalChatMessage, AppSnapshot, FileCategory, GithubConfig 
+  ROLE_LABELS, Comment, APP_VERSION, AppNotification, GlobalChatMessage, AppSnapshot, FileCategory, GithubConfig, InvitePayload 
 } from './types.ts';
 import TaskDetails from './components/TaskDetails.tsx';
 import { AdminPanel } from './components/AdminPanel.tsx';
@@ -12,6 +12,7 @@ import { ProjectForm } from './components/ProjectForm.tsx';
 import { AIAssistant } from './components/AIAssistant.tsx';
 import { NotificationCenter } from './components/NotificationCenter.tsx';
 import { GlobalChat } from './components/GlobalChat.tsx';
+import { Logo } from './components/Logo.tsx';
 import { 
   LayoutGrid, 
   UserCircle, 
@@ -24,13 +25,20 @@ import {
   Zap,
   Building2,
   HardDrive,
-  DownloadCloud
+  DownloadCloud,
+  Crown
 } from 'lucide-react';
 
 export const STORAGE_KEYS = {
   MASTER_STATE: `zodchiy_master_v128`,
   AUTH_USER: `zod_auth_v128`,
   GH_CONFIG: `zod_gh_v128`
+};
+
+const toBase64 = (str: string) => {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => 
+    String.fromCharCode(parseInt(p1, 16))
+  ));
 };
 
 const fromBase64 = (str: string) => {
@@ -106,6 +114,8 @@ const App: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  const isMasterMode = activeRole === UserRole.ADMIN;
+
   const dbSize = useMemo(() => {
     const str = JSON.stringify(db);
     const bytes = new Blob([str]).size;
@@ -141,15 +151,38 @@ const App: React.FC = () => {
     setDb(prev => smartMerge(data, prev));
   }, [smartMerge]);
 
+  const handleApplyInvite = useCallback((code: string) => {
+    try {
+      const invite: InvitePayload = JSON.parse(fromBase64(code));
+      if (invite.token && invite.repo && invite.role) {
+        const newGhConfig: GithubConfig = { 
+          token: invite.token, 
+          repo: invite.repo, 
+          path: invite.path || 'zodchiy_db.json' 
+        };
+        localStorage.setItem(STORAGE_KEYS.GH_CONFIG, JSON.stringify(newGhConfig));
+        const targetUser = db.users.find(u => u.role === invite.role && u.username === invite.username) 
+                          || db.users.find(u => u.role === invite.role)
+                          || db.users[0];
+        setCurrentUser(targetUser);
+        setActiveRole(targetUser.role);
+        localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(targetUser));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Invite application failed", e);
+      return false;
+    }
+  }, [db.users]);
+
   useEffect(() => {
     const pollInterval = setInterval(async () => {
       const rawConfig = localStorage.getItem(STORAGE_KEYS.GH_CONFIG);
       if (!rawConfig) return;
-      
       try {
         const config: GithubConfig = JSON.parse(rawConfig);
         if (!config.token || !config.repo) return;
-
         setIsSyncing(true);
         const url = `https://api.github.com/repos/${config.repo}/contents/${config.path}`;
         const response = await fetch(url, { 
@@ -159,11 +192,9 @@ const App: React.FC = () => {
           },
           cache: 'no-store' 
         });
-        
         if (response.ok) {
           const data = await response.json();
           const remoteDb = JSON.parse(fromBase64(data.content)) as AppSnapshot;
-          
           if (new Date(remoteDb.timestamp) > new Date(db.timestamp)) {
             handleImportData(remoteDb);
           }
@@ -177,7 +208,6 @@ const App: React.FC = () => {
         setTimeout(() => setIsSyncing(false), 1500);
       }
     }, 45000); 
-
     return () => clearInterval(pollInterval);
   }, [db.timestamp, handleImportData]);
 
@@ -205,18 +235,28 @@ const App: React.FC = () => {
   };
 
   const handleAppUpdate = async () => {
-    if ('serviceWorker' in navigator) {
-      try {
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
         const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.update();
-        }
-      } catch (e) {
-        console.error("SW Update failed", e);
+        // Используем Promise.all с обработкой ошибок для каждого обновления
+        await Promise.all(registrations.map(async (registration) => {
+          try {
+            await registration.update();
+          } catch (e) {
+            // Игнорируем ошибки индивидуальных регистраций
+          }
+        }));
       }
+    } catch (e) {
+      // Игнорируем ошибку "The document is in an invalid state", 
+      // так как она не критична перед перезагрузкой страницы.
+      if (!(e instanceof Error && e.message.includes('invalid state'))) {
+        console.warn("SW Update warning:", e);
+      }
+    } finally {
+      // Всегда перезагружаем страницу для применения обновлений
+      window.location.reload();
     }
-    // Fixed: window.location.reload() expects 0 arguments.
-    window.location.reload();
   };
 
   const addTask = (projectId: number) => {
@@ -292,44 +332,42 @@ const App: React.FC = () => {
     }));
   };
 
-  if (!currentUser) return <LoginPage users={db.users} onLogin={handleLogin} />;
+  if (!currentUser) return <LoginPage users={db.users} onLogin={handleLogin} onApplyInvite={handleApplyInvite} />;
 
   const selectedProject = db.projects.find(p => p.id === selectedProjectId);
   const selectedTask = db.tasks.find(t => t.id === selectedTaskId);
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
-      <header className="bg-white px-6 py-5 border-b border-slate-100 flex items-center justify-between shrink-0 z-40">
+    <div className={`flex flex-col h-full overflow-hidden transition-colors duration-500 ${isMasterMode ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
+      <header className={`px-6 py-5 border-b flex items-center justify-between shrink-0 z-40 transition-all duration-500 ${isMasterMode ? 'bg-slate-900 border-white/5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.2)]' : 'bg-white border-slate-100 text-slate-900 shadow-sm'}`}>
         <button onClick={resetToHome} className="flex items-center gap-3 active:scale-95 transition-all text-left group">
-          <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100 group-hover:rotate-3 transition-transform">
-            <Building2 size={26} />
-          </div>
+          <Logo isMaster={isMasterMode} size={44} className="group-hover:rotate-6 transition-transform" />
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-black tracking-tighter text-slate-900 leading-none shrink-0">ЗОДЧИЙ</h1>
-              <div className="h-4 w-1 bg-blue-600/30 rounded-full shrink-0"></div>
-              <span className="text-sm font-black text-slate-800 leading-none uppercase tracking-tight truncate max-w-[140px] pt-0.5">
+              <h1 className={`text-xl font-black tracking-tighter leading-none shrink-0 ${isMasterMode ? 'text-white' : 'text-slate-900'}`}>ЗОДЧИЙ</h1>
+              <div className={`h-4 w-1 rounded-full shrink-0 ${isMasterMode ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-blue-600/30'}`}></div>
+              <span className={`text-sm font-black leading-none uppercase tracking-tight truncate max-w-[140px] pt-0.5 ${isMasterMode ? 'text-yellow-400' : 'text-slate-800'}`}>
                 {currentUser.username}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1.5 overflow-hidden">
-              <span className="text-[8px] font-black text-blue-600 leading-none uppercase tracking-widest shrink-0">
-                {ROLE_LABELS[activeRole]}
+              <span className={`text-[8px] font-black leading-none uppercase tracking-widest shrink-0 flex items-center gap-1 ${isMasterMode ? 'text-yellow-500' : 'text-blue-600'}`}>
+                {isMasterMode && <Crown size={8} />} {ROLE_LABELS[activeRole]}
               </span>
-              <div className="w-1 h-1 rounded-full bg-slate-300 shrink-0"></div>
+              <div className={`w-1 h-1 rounded-full shrink-0 ${isMasterMode ? 'bg-white/20' : 'bg-slate-300'}`}></div>
               <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSyncing ? 'bg-blue-500 animate-pulse' : syncError ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
-              <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none whitespace-nowrap">
-                v{APP_VERSION}
+              <p className={`text-[7px] font-black uppercase tracking-[0.2em] leading-none whitespace-nowrap ${isMasterMode ? 'text-white/40' : 'text-slate-400'}`}>
+                {isMasterMode ? 'MASTER CORE' : 'STAFF EDITION'} v{APP_VERSION}
               </p>
             </div>
           </div>
         </button>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 bg-slate-50 text-slate-500 rounded-xl hover:bg-blue-50 transition-all">
+          <button onClick={() => setShowNotifications(!showNotifications)} className={`relative p-2.5 rounded-xl transition-all ${isMasterMode ? 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white' : 'bg-slate-50 text-slate-500 hover:bg-blue-50'}`}>
             <Bell size={20} />
             {db.notifications.some(n => !n.isRead) && <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>}
           </button>
-          <button onClick={() => setActiveTab('profile')} className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-md border-2 border-white">
+          <button onClick={() => setActiveTab('profile')} className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shadow-md border-2 ${isMasterMode ? 'bg-yellow-500 text-slate-900 border-white/20' : 'bg-blue-600 text-white border-white'}`}>
             {currentUser.username[0]}
           </button>
         </div>
@@ -345,7 +383,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-32 text-left scrollbar-hide">
+      <main className={`flex-1 overflow-y-auto p-4 sm:p-6 pb-32 text-left scrollbar-hide ${isMasterMode ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
         {editingProject ? (
           <ProjectForm 
             project={editingProject} 
@@ -403,18 +441,18 @@ const App: React.FC = () => {
           />
         ) : activeTab === 'dashboard' ? (
           <div className="space-y-6">
-            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-1">Объекты в управлении</h2>
+            <h2 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-1 ${isMasterMode ? 'text-white/40' : 'text-slate-400'}`}>Объекты в управлении</h2>
             <div className="grid gap-4">
               {db.projects.map(p => (
-                <div key={p.id} onClick={() => setSelectedProjectId(p.id)} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer hover:border-blue-200">
+                <div key={p.id} onClick={() => setSelectedProjectId(p.id)} className={`p-6 rounded-[2rem] border shadow-sm active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer ${isMasterMode ? 'bg-slate-900 border-white/5 hover:border-yellow-500/50' : 'bg-white border-slate-100 hover:border-blue-200'}`}>
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black group-hover:bg-blue-600 group-hover:text-white transition-colors">{p.name[0]}</div>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black transition-colors ${isMasterMode ? 'bg-white/5 text-yellow-500 group-hover:bg-yellow-500 group-hover:text-slate-900' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>{p.name[0]}</div>
                     <div className="text-left">
-                      <h3 className="font-black text-slate-800 tracking-tight leading-none mb-1 group-hover:text-blue-600 transition-colors">{p.name}</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.address}</p>
+                      <h3 className={`font-black tracking-tight leading-none mb-1 transition-colors ${isMasterMode ? 'text-white group-hover:text-yellow-400' : 'text-slate-800 group-hover:text-blue-600'}`}>{p.name}</h3>
+                      <p className={`text-[9px] font-bold uppercase tracking-widest ${isMasterMode ? 'text-white/40' : 'text-slate-400'}`}>{p.address}</p>
                     </div>
                   </div>
-                  <LayoutGrid size={18} className="text-slate-200 group-hover:text-blue-600" />
+                  <LayoutGrid size={18} className={`${isMasterMode ? 'text-white/20 group-hover:text-yellow-500' : 'text-slate-200 group-hover:text-blue-600'}`} />
                 </div>
               ))}
             </div>
@@ -449,73 +487,67 @@ const App: React.FC = () => {
           <BackupManager currentUser={currentUser} currentDb={db} onDataImport={handleImportData} />
         ) : (
           <div className="space-y-6">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
-              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className={`p-8 rounded-[2.5rem] border shadow-sm text-center ${isMasterMode ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100'}`}>
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isMasterMode ? 'bg-yellow-500/10 text-yellow-500' : 'bg-blue-50 text-blue-600'}`}>
                 <UserCircle size={48} />
               </div>
-              <h2 className="text-xl font-black text-slate-800 mb-1 uppercase tracking-tighter">{currentUser.username}</h2>
-              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-8">{ROLE_LABELS[activeRole]}</p>
-              <button onClick={handleLogout} className="w-full py-4 bg-rose-50 text-rose-600 font-black rounded-2xl border border-rose-100 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] hover:bg-rose-600 hover:text-white transition-all">
+              <h2 className={`text-xl font-black mb-1 uppercase tracking-tighter ${isMasterMode ? 'text-white' : 'text-slate-800'}`}>{currentUser.username}</h2>
+              <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-8 ${isMasterMode ? 'text-yellow-500' : 'text-blue-600'}`}>{ROLE_LABELS[activeRole]}</p>
+              <button onClick={handleLogout} className={`w-full py-4 font-black rounded-2xl border flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] transition-all ${isMasterMode ? 'bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-600 hover:text-white'}`}>
                 <LogOut size={18} /> Выйти из системы
               </button>
             </div>
 
-            <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-white/10 shadow-xl text-left">
+            <div className={`p-6 rounded-[2.5rem] border shadow-xl text-left ${isMasterMode ? 'bg-slate-800 border-white/10' : 'bg-slate-900 border-white/10'}`}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg"><HardDrive size={18} /></div>
+                <div className={`p-2 rounded-lg ${isMasterMode ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-400'}`}><HardDrive size={18} /></div>
                 <h4 className="text-[11px] font-black text-white uppercase tracking-widest">Системные ресурсы</h4>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Размер базы</p>
-                  <p className="text-lg font-black text-blue-400 leading-none">{dbSize} КБ</p>
+                  <p className={`text-lg font-black leading-none ${isMasterMode ? 'text-yellow-400' : 'text-blue-400'}`}>{dbSize} КБ</p>
                 </div>
                 <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Версия ядра</p>
-                  <p className="text-lg font-black text-emerald-400 leading-none">{APP_VERSION}</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Ядро системы</p>
+                  <p className={`text-lg font-black leading-none ${isMasterMode ? 'text-emerald-400' : 'text-emerald-400'}`}>{APP_VERSION}</p>
                 </div>
               </div>
               
               <button 
                 onClick={handleAppUpdate}
-                className="w-full mt-6 py-4 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+                className={`w-full mt-6 py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isMasterMode ? 'bg-yellow-500 text-slate-900 shadow-yellow-500/20' : 'bg-blue-600 text-white shadow-blue-500/20'}`}
               >
                 <DownloadCloud size={18} /> Обновить ядро APP
               </button>
-
-              <div className="mt-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                <p className="text-[9px] font-bold text-blue-300 leading-tight">
-                  Статус системы: v{APP_VERSION} Стабильно. Обновите приложение при обнаружении ошибок.
-                </p>
-              </div>
             </div>
           </div>
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-slate-100 px-6 pt-4 pb-[calc(1rem+var(--sab))] flex items-center justify-between z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.03)]">
-        <button onClick={resetToHome} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'dashboard' ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
+      <nav className={`fixed bottom-0 left-0 right-0 border-t px-6 pt-4 pb-[calc(1rem+var(--sab))] flex items-center justify-between z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] transition-all duration-500 ${isMasterMode ? 'bg-slate-900/90 backdrop-blur-2xl border-white/5' : 'bg-white/90 backdrop-blur-2xl border-slate-100'}`}>
+        <button onClick={resetToHome} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'dashboard' ? (isMasterMode ? 'text-yellow-500 scale-110' : 'text-blue-600 scale-110') : (isMasterMode ? 'text-white/30' : 'text-slate-400')}`}>
           <LayoutGrid size={22} />
           <span className="text-[7px] font-black uppercase tracking-widest">Объекты</span>
         </button>
-        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
+        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'chat' ? (isMasterMode ? 'text-yellow-500 scale-110' : 'text-blue-600 scale-110') : (isMasterMode ? 'text-white/30' : 'text-slate-400')}`}>
           <MessageSquare size={22} />
           <span className="text-[7px] font-black uppercase tracking-widest">Чат</span>
         </button>
         {activeRole === UserRole.ADMIN && (
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'admin' ? 'text-amber-500 scale-110' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'admin' ? 'text-amber-500 scale-110' : (isMasterMode ? 'text-white/30' : 'text-slate-400')}`}>
             <CheckSquare size={22} />
             <span className="text-[7px] font-black uppercase tracking-widest">Админ</span>
           </button>
         )}
-        <button onClick={() => setActiveTab('sync')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'sync' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+        <button onClick={() => setActiveTab('sync')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'sync' ? (isMasterMode ? 'text-indigo-400 scale-110' : 'text-indigo-600 scale-110') : (isMasterMode ? 'text-white/30' : 'text-slate-400')}`}>
           <div className="relative">
             <RefreshCw size={22} className={isSyncing ? "animate-spin" : ""} />
             <Cloud size={8} className="absolute -top-1 -right-1 text-indigo-500" />
           </div>
           <span className="text-[7px] font-black uppercase tracking-widest">Синхро</span>
         </button>
-        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'profile' ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
+        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'profile' ? (isMasterMode ? 'text-yellow-500 scale-110' : 'text-blue-600 scale-110') : (isMasterMode ? 'text-white/30' : 'text-slate-400')}`}>
           <UserCircle size={22} />
           <span className="text-[7px] font-black uppercase tracking-widest">Профиль</span>
         </button>
