@@ -22,16 +22,16 @@ import {
   MessageSquare,
   Cloud,
   Zap,
-  Building2
+  Building2,
+  HardDrive
 } from 'lucide-react';
 
 export const STORAGE_KEYS = {
-  MASTER_STATE: `zodchiy_master_v127`,
-  AUTH_USER: `zod_auth_v127`,
-  GH_CONFIG: `zod_gh_v127`
+  MASTER_STATE: `zodchiy_master_v128`,
+  AUTH_USER: `zod_auth_v128`,
+  GH_CONFIG: `zod_gh_v128`
 };
 
-// Исправленный декодер Base64 с поддержкой UTF-8
 const fromBase64 = (str: string) => {
   try {
     return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
@@ -41,7 +41,6 @@ const fromBase64 = (str: string) => {
   }
 };
 
-// Надежный генератор уникальных ID
 const generateUID = (prefix: string = 'id') => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const INITIAL_PROJECTS: Project[] = [
@@ -106,7 +105,13 @@ const App: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Smart Merge Logic: объединение массивов по уникальным ID
+  // Расчет веса базы данных
+  const dbSize = useMemo(() => {
+    const str = JSON.stringify(db);
+    const bytes = new Blob([str]).size;
+    return (bytes / 1024).toFixed(2); // в КБ
+  }, [db]);
+
   const smartMerge = useCallback((remote: AppSnapshot, local: AppSnapshot): AppSnapshot => {
     const mergeArrays = <T extends { id: any }>(arr1: T[], arr2: T[]): T[] => {
       const map = new Map<any, T>();
@@ -128,7 +133,7 @@ const App: React.FC = () => {
       tasks: mergeArrays(local.tasks, remote.tasks),
       chatMessages: mergeArrays(local.chatMessages, remote.chatMessages),
       notifications: mergeArrays(local.notifications, remote.notifications),
-      users: remote.users // Список пользователей всегда берем из облака
+      users: remote.users 
     };
   }, []);
 
@@ -136,7 +141,6 @@ const App: React.FC = () => {
     setDb(prev => smartMerge(data, prev));
   }, [smartMerge]);
 
-  // Auto-Polling
   useEffect(() => {
     const pollInterval = setInterval(async () => {
       const rawConfig = localStorage.getItem(STORAGE_KEYS.GH_CONFIG);
@@ -419,15 +423,39 @@ const App: React.FC = () => {
         ) : activeTab === 'sync' ? (
           <BackupManager currentUser={currentUser} currentDb={db} onDataImport={handleImportData} />
         ) : (
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
-            <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <UserCircle size={48} />
+          <div className="space-y-6">
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center">
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <UserCircle size={48} />
+              </div>
+              <h2 className="text-xl font-black text-slate-800 mb-1 uppercase tracking-tighter">{currentUser.username}</h2>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-8">{ROLE_LABELS[activeRole]}</p>
+              <button onClick={handleLogout} className="w-full py-4 bg-rose-50 text-rose-600 font-black rounded-2xl border border-rose-100 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] hover:bg-rose-600 hover:text-white transition-all">
+                <LogOut size={18} /> Выйти из системы
+              </button>
             </div>
-            <h2 className="text-xl font-black text-slate-800 mb-1 uppercase tracking-tighter">{currentUser.username}</h2>
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-8">{ROLE_LABELS[activeRole]}</p>
-            <button onClick={handleLogout} className="w-full py-4 bg-rose-50 text-rose-600 font-black rounded-2xl border border-rose-100 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] hover:bg-rose-600 hover:text-white transition-all">
-              <LogOut size={18} /> Выйти из системы
-            </button>
+
+            <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-white/10 shadow-xl text-left">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg"><HardDrive size={18} /></div>
+                <h4 className="text-[11px] font-black text-white uppercase tracking-widest">Системные ресурсы</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Размер базы</p>
+                  <p className="text-lg font-black text-blue-400 leading-none">{dbSize} КБ</p>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Версия ядра</p>
+                  <p className="text-lg font-black text-emerald-400 leading-none">{APP_VERSION}</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                <p className="text-[9px] font-bold text-blue-300 leading-tight">
+                  Статус системы: Стабильно. Рекомендуемый вес базы до 2048 КБ для оптимальной работы PWA.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </main>
