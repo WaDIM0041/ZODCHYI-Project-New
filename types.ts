@@ -30,7 +30,7 @@ export enum ProjectStatus {
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  [UserRole.ADMIN]: 'Генеральный Зодчий',
+  [UserRole.ADMIN]: 'Администратор',
   [UserRole.MANAGER]: 'Менеджер проектов',
   [UserRole.FOREMAN]: 'Прораб участка',
   [UserRole.SUPERVISOR]: 'Технадзор',

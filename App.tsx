@@ -71,7 +71,7 @@ const DEFAULT_STATE: AppSnapshot = {
   notifications: [],
   chatMessages: [],
   users: [
-    { id: 1, username: 'Генеральный', role: UserRole.ADMIN, password: '123' },
+    { id: 1, username: 'Администратор', role: UserRole.ADMIN, password: '123' },
     { id: 2, username: 'Менеджер', role: UserRole.MANAGER, password: '123' },
     { id: 3, username: 'Прораб 1', role: UserRole.FOREMAN, password: '123' },
     { id: 4, username: 'Технадзор', role: UserRole.SUPERVISOR, password: '123' },
@@ -310,6 +310,14 @@ const App: React.FC = () => {
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [isEditingProject, setIsEditingProject] = useState(false);
 
+  const handleGoHome = () => {
+    setSelectedProjectId(null);
+    setSelectedTaskId(null);
+    setIsAddingProject(false);
+    setIsEditingProject(false);
+    setActiveTab('dashboard');
+  };
+
   const uploadProjectFile = async (pid: number, file: File, cat: FileCategory) => {
     setSyncStatus('syncing');
     try {
@@ -370,10 +378,13 @@ const App: React.FC = () => {
   return (
     <div className={`flex flex-col h-full overflow-hidden transition-colors duration-500 ${activeRole === UserRole.ADMIN ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
       <header className={`px-5 py-4 border-b flex items-center justify-between sticky top-0 z-50 backdrop-blur-md transition-all ${activeRole === UserRole.ADMIN ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'}`}>
-        <div className="flex items-center gap-3">
+        <button 
+          onClick={handleGoHome}
+          className="flex items-center gap-3 active:scale-95 transition-transform cursor-pointer group"
+        >
           <Logo size={32} isMaster={activeRole === UserRole.ADMIN} />
-          <div>
-            <h1 className={`text-xs font-black uppercase tracking-widest leading-none transition-colors ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-900'}`}>Зодчий</h1>
+          <div className="text-left">
+            <h1 className={`text-xs font-black uppercase tracking-widest leading-none transition-colors group-hover:text-blue-500 ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-900'}`}>Зодчий</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded bg-blue-600 text-white">{ROLE_LABELS[activeRole]}</span>
               <div className={`flex items-center gap-1 px-1 py-0.5 rounded-full transition-all ${syncStatus === 'syncing' ? 'bg-blue-50' : 'bg-slate-100'}`}>
@@ -382,7 +393,7 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </button>
         <button onClick={() => { localStorage.removeItem(STORAGE_KEYS.AUTH_USER); setCurrentUser(null); }} className="p-2.5 bg-rose-50 text-rose-500 rounded-xl active:scale-90 transition-transform"><LogOut size={18} /></button>
       </header>
 
