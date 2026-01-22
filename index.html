@@ -4,15 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>ЗОДЧИЙ • v1.5.3</title>
+    <title>ЗОДЧИЙ • v1.5.4</title>
     
     <link rel="preconnect" href="https://esm.sh" crossorigin>
-    <link rel="dns-prefetch" href="https://esm.sh">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4333/4333645.png">
     
@@ -34,12 +31,11 @@
             background-color: #0f172a; 
             margin: 0; padding: 0;
             overflow: hidden;
-            -webkit-user-select: none;
         }
         #root { 
             width: 100%; height: 100vh; display: flex; flex-direction: column; background: #f8fafc;
             padding-top: var(--sat); padding-bottom: var(--sab);
-            opacity: 0; transition: opacity 0.3s ease-out;
+            opacity: 0; transition: opacity 0.4s ease-in-out;
         }
         #root.mounted { opacity: 1; }
         
@@ -49,8 +45,8 @@
             z-index: 9999; text-align: center;
         }
         .loader {
-            width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.05); border-bottom-color: var(--primary);
-            border-radius: 50%; animation: rotation 0.6s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.05); border-bottom-color: var(--primary);
+            border-radius: 50%; animation: rotation 0.8s linear infinite;
         }
         @keyframes rotation { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
     </style>
@@ -63,7 +59,7 @@
             if(splash) {
                 splash.style.opacity = '0'; 
                 if (root) root.classList.add('mounted');
-                setTimeout(() => splash.remove(), 400); 
+                setTimeout(() => splash.remove(), 500); 
             }
         }
         window.hideAppSplash = hideSplash;
@@ -88,7 +84,7 @@
 <body>
     <div id="splash">
         <div class="loader"></div>
-        <p style="color: rgba(255,255,255,0.4); font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.4em; margin-top: 20px;">ЗОДЧИЙ • v1.5.3</p>
+        <p style="color: rgba(255,255,255,0.3); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5em; margin-top: 24px;">ЗОДЧИЙ • v1.5.4</p>
     </div>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>

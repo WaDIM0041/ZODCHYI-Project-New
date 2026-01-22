@@ -26,9 +26,9 @@ import {
 } from 'lucide-react';
 
 export const STORAGE_KEYS = {
-  MASTER_STATE: `zod_master_v1.5.3`,
-  AUTH_USER: `zod_auth_v1.5.3`,
-  GH_CONFIG: `zod_gh_v1.5.3`
+  MASTER_STATE: `zod_master_v1.5.4`,
+  AUTH_USER: `zod_auth_v1.5.4`,
+  GH_CONFIG: `zod_gh_v1.5.4`
 };
 
 const toBase64 = (str: string) => btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode(parseInt(p1, 16))));
@@ -167,7 +167,7 @@ const App: React.FC = () => {
           setSyncError(false);
         }
       } catch { setSyncError(true); }
-    }, 15000);
+    }, 10000); // Поллинг каждые 10 секунд
     return () => clearInterval(poll);
   }, [db.timestamp, isSyncing, handleImportData]);
 
@@ -212,15 +212,61 @@ const App: React.FC = () => {
     } catch { return false; }
   }} />;
 
+  // ЦЕНТРАЛЬНАЯ ЛОГИКА РЕНДЕРИНГА (ROUTING)
+  const renderContent = () => {
+    // 1. Приоритетные глобальные вкладки
+    switch (activeTab) {
+      case 'chat': return <GlobalChat messages={db.chatMessages} currentUser={currentUser} currentRole={activeRole} onSendMessage={handleSendMessage} />;
+      case 'admin': return <AdminPanel users={db.users} currentUser={currentUser} activeRole={activeRole} onUpdateUsers={u => setDb(prev => ({...prev, users: u}))} onRoleSwitch={setActiveRole} />;
+      case 'sync': return <BackupManager currentUser={currentUser} currentDb={db} onDataImport={handleImportData} />;
+      case 'profile': return (
+        <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-bottom-4">
+          <div className={`p-8 rounded-[2.5rem] border text-center ${activeRole === UserRole.ADMIN ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100 shadow-xl'}`}>
+            <div className="w-20 h-20 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center mx-auto mb-6"><UserCircle size={48} /></div>
+            <h2 className={`text-xl font-black mb-1 ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-900'}`}>{currentUser.username}</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-8 text-blue-500">{ROLE_LABELS[activeRole]}</p>
+            <button onClick={() => { setCurrentUser(null); localStorage.removeItem(STORAGE_KEYS.AUTH_USER); }} className="w-full py-4 font-black rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-widest text-[9px]">Выход из системы</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Логика Объектов (dashboard)
+    if (editingProject) return <ProjectForm project={editingProject} onSave={p => { setDb(prev => ({ ...prev, projects: prev.projects.map(o => o.id === p.id ? p : o) })); setEditingProject(null); }} onCancel={() => setEditingProject(null)} />;
+    if (selectedTaskId) return <TaskDetails task={db.tasks.find(t => t.id === selectedTaskId)!} role={activeRole} isAdmin={activeRole === UserRole.ADMIN} onClose={() => setSelectedTaskId(null)} onStatusChange={updateTaskStatus} onAddComment={(tid, txt) => handleSendMessage(txt)} onAddEvidence={(tid, f) => updateTaskStatus(tid, db.tasks.find(x => x.id === tid)!.status, f)} />;
+    if (selectedProjectId) return <ProjectView project={db.projects.find(p => p.id === selectedProjectId)!} tasks={db.tasks.filter(t => t.projectId === selectedProjectId)} currentUser={currentUser} activeRole={activeRole} onBack={() => setSelectedProjectId(null)} onEdit={setEditingProject} onAddTask={() => {}} onSelectTask={setSelectedTaskId} onSendMessage={t => handleSendMessage(t, selectedProjectId)} onAddFile={(pid, f, cat) => { setDb(prev => { const now = new Date().toISOString(); const up = { ...prev, timestamp: now, projects: prev.projects.map(p => p.id === pid ? { ...p, updatedAt: now, fileLinks: [...(p.fileLinks || []), { name: f.name, url: URL.createObjectURL(f), category: cat, createdAt: now }] } : p) }; pushToCloud(up); return up; }); }} />;
+
+    // 3. Список всех объектов (Default Dashboard)
+    return (
+      <div className="space-y-4">
+         <h2 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 ml-1">Объекты управления</h2>
+         <div className="grid gap-3">
+           {db.projects.map(p => (
+             <div key={p.id} onClick={() => setSelectedProjectId(p.id)} className={`p-5 rounded-3xl border shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-between ${activeRole === UserRole.ADMIN ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100'}`}>
+               <div className="flex items-center gap-4">
+                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${activeRole === UserRole.ADMIN ? 'bg-white/5 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>{p.name[0]}</div>
+                 <div className="text-left">
+                   <h3 className={`font-black tracking-tight leading-none mb-1 ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-800'}`}>{p.name}</h3>
+                   <p className="text-[8px] font-bold uppercase opacity-30">{p.address}</p>
+                 </div>
+               </div>
+               <LayoutGrid size={14} className="opacity-10" />
+             </div>
+           ))}
+         </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`flex flex-col h-full overflow-hidden ${activeRole === UserRole.ADMIN ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
       <header className={`px-5 py-4 border-b flex items-center justify-between shrink-0 z-40 backdrop-blur-md ${activeRole === UserRole.ADMIN ? 'bg-slate-900/80 border-white/5 text-white' : 'bg-white/80 border-slate-100 text-slate-900 shadow-sm'}`}>
         <button onClick={() => { setActiveTab('dashboard'); setSelectedProjectId(null); setSelectedTaskId(null); }} className="flex items-center gap-3">
           <Logo isMaster={activeRole === UserRole.ADMIN} size={36} />
-          <div className="flex flex-col">
+          <div className="flex flex-col text-left">
             <h1 className="text-base font-black tracking-tighter leading-none">ЗОДЧИЙ <span className="text-blue-500 text-[8px] opacity-40 ml-1">v{APP_VERSION}</span></h1>
             <div className="flex items-center gap-1.5 mt-1">
-              <div className={`w-1 h-1 rounded-full ${syncError ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+              <div className={`w-1 h-1 rounded-full ${syncError ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`}></div>
               <span className="text-[7px] font-black uppercase tracking-widest opacity-60">{ROLE_LABELS[activeRole]}</span>
             </div>
           </div>
@@ -238,77 +284,27 @@ const App: React.FC = () => {
 
       {showNotifications && <NotificationCenter notifications={db.notifications} currentRole={activeRole} onClose={() => setShowNotifications(false)} onMarkRead={id => setDb(prev => ({ ...prev, notifications: prev.notifications.map(n => n.id === id ? {...n, isRead: true} : n)}))} onClearAll={() => setDb(prev => ({ ...prev, notifications: [] }))} />}
 
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 text-left scrollbar-hide">
-        {activeTab === 'dashboard' && !selectedProjectId && (
-          <div className="space-y-4">
-             <h2 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 ml-1">Объекты управления</h2>
-             <div className="grid gap-3">
-               {db.projects.map(p => (
-                 <div key={p.id} onClick={() => setSelectedProjectId(p.id)} className={`p-5 rounded-3xl border shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-between ${activeRole === UserRole.ADMIN ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100'}`}>
-                   <div className="flex items-center gap-4">
-                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${activeRole === UserRole.ADMIN ? 'bg-white/5 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>{p.name[0]}</div>
-                     <div>
-                       <h3 className={`font-black tracking-tight leading-none mb-1 ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-800'}`}>{p.name}</h3>
-                       <p className="text-[8px] font-bold uppercase opacity-30">{p.address}</p>
-                     </div>
-                   </div>
-                   <LayoutGrid size={14} className="opacity-10" />
-                 </div>
-               ))}
-             </div>
-          </div>
-        )}
-
-        {selectedProjectId && !selectedTaskId && (
-          <ProjectView 
-            project={db.projects.find(p => p.id === selectedProjectId)!} tasks={db.tasks.filter(t => t.projectId === selectedProjectId)}
-            currentUser={currentUser} activeRole={activeRole} onBack={() => setSelectedProjectId(null)} onEdit={setEditingProject}
-            onAddTask={() => {}} onSelectTask={setSelectedTaskId} onSendMessage={t => handleSendMessage(t, selectedProjectId)}
-            onAddFile={(pid, f, cat) => {
-              setDb(prev => {
-                const now = new Date().toISOString();
-                const up = { ...prev, timestamp: now, projects: prev.projects.map(p => p.id === pid ? { ...p, updatedAt: now, fileLinks: [...(p.fileLinks || []), { name: f.name, url: URL.createObjectURL(f), category: cat, createdAt: now }] } : p) };
-                pushToCloud(up); return up;
-              });
-            }}
-          />
-        )}
-
-        {selectedTaskId && (
-          <TaskDetails 
-            task={db.tasks.find(t => t.id === selectedTaskId)!} role={activeRole} isAdmin={activeRole === UserRole.ADMIN}
-            onClose={() => setSelectedTaskId(null)} onStatusChange={updateTaskStatus}
-            onAddComment={(tid, txt) => handleSendMessage(txt)} onAddEvidence={(tid, f) => updateTaskStatus(tid, db.tasks.find(x => x.id === tid)!.status, f)}
-          />
-        )}
-
-        {activeTab === 'chat' && <GlobalChat messages={db.chatMessages} currentUser={currentUser} currentRole={activeRole} onSendMessage={handleSendMessage} />}
-        {activeTab === 'admin' && <AdminPanel users={db.users} currentUser={currentUser} activeRole={activeRole} onUpdateUsers={u => setDb(prev => ({...prev, users: u}))} onRoleSwitch={setActiveRole} />}
-        {activeTab === 'sync' && <BackupManager currentUser={currentUser} currentDb={db} onDataImport={handleImportData} />}
-        {activeTab === 'profile' && (
-           <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-bottom-4">
-              <div className={`p-8 rounded-[2rem] border text-center ${activeRole === UserRole.ADMIN ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100 shadow-xl'}`}>
-                <div className="w-20 h-20 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center mx-auto mb-6"><UserCircle size={48} /></div>
-                <h2 className={`text-xl font-black mb-1 ${activeRole === UserRole.ADMIN ? 'text-white' : 'text-slate-900'}`}>{currentUser.username}</h2>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-8 text-blue-500">{ROLE_LABELS[activeRole]}</p>
-                <button onClick={() => { setCurrentUser(null); localStorage.removeItem(STORAGE_KEYS.AUTH_USER); }} className="w-full py-4 font-black rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-widest text-[9px]">Выход из системы</button>
-              </div>
-           </div>
-        )}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 scrollbar-hide">
+        {renderContent()}
       </main>
 
       <nav className={`fixed bottom-0 left-0 right-0 border-t px-6 pt-3 pb-[calc(1rem+var(--sab))] flex items-center justify-between z-40 backdrop-blur-xl ${activeRole === UserRole.ADMIN ? 'bg-slate-900/90 border-white/5' : 'bg-white/90 border-slate-100 shadow-2xl'}`}>
-        <button onClick={() => { setActiveTab('dashboard'); setSelectedProjectId(null); setSelectedTaskId(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-blue-500 scale-110' : 'opacity-20'}`}>
+        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-blue-500 scale-110' : 'opacity-20 hover:opacity-40'}`}>
           <LayoutGrid size={22} /><span className="text-[6px] font-black uppercase">Объекты</span>
         </button>
-        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'chat' ? 'text-blue-500 scale-110' : 'opacity-20'}`}>
+        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'chat' ? 'text-blue-500 scale-110' : 'opacity-20 hover:opacity-40'}`}>
           <MessageSquare size={22} /><span className="text-[6px] font-black uppercase">Чат</span>
         </button>
-        <button onClick={() => setActiveTab('sync')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'sync' ? 'text-blue-500 scale-110' : 'opacity-20'}`}>
+        {activeRole === UserRole.ADMIN && (
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin' ? 'text-blue-500 scale-110' : 'opacity-20 hover:opacity-40'}`}>
+            <CheckSquare size={22} /><span className="text-[6px] font-black uppercase">Админ</span>
+          </button>
+        )}
+        <button onClick={() => setActiveTab('sync')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'sync' ? 'text-blue-500 scale-110' : 'opacity-20 hover:opacity-40'}`}>
           <div className="relative"><RefreshCw size={22} className={isSyncing ? "animate-spin" : ""} /><Cloud size={8} className="absolute -top-1 -right-1" /></div>
           <span className="text-[6px] font-black uppercase">Синхро</span>
         </button>
-        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-blue-500 scale-110' : 'opacity-20'}`}>
+        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-blue-500 scale-110' : 'opacity-20 hover:opacity-40'}`}>
           <UserCircle size={22} /><span className="text-[6px] font-black uppercase">Профиль</span>
         </button>
       </nav>
