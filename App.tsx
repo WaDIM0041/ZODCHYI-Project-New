@@ -26,9 +26,9 @@ import {
 } from 'lucide-react';
 
 export const STORAGE_KEYS = {
-  MASTER_STATE: `zodchiy_master_v126`,
-  AUTH_USER: `zod_auth_v126`,
-  GH_CONFIG: `zod_gh_v126`
+  MASTER_STATE: `zodchiy_master_v127`,
+  AUTH_USER: `zod_auth_v127`,
+  GH_CONFIG: `zod_gh_v127`
 };
 
 // Исправленный декодер Base64 с поддержкой UTF-8
@@ -149,7 +149,10 @@ const App: React.FC = () => {
         setIsSyncing(true);
         const url = `https://api.github.com/repos/${config.repo}/contents/${config.path}`;
         const response = await fetch(url, { 
-          headers: { 'Authorization': `Bearer ${config.token.trim()}` },
+          headers: { 
+            'Authorization': `Bearer ${config.token.trim()}`,
+            'Accept': 'application/vnd.github+json'
+          },
           cache: 'no-store' 
         });
         
@@ -169,7 +172,7 @@ const App: React.FC = () => {
       } finally {
         setTimeout(() => setIsSyncing(false), 1500);
       }
-    }, 45000); // 45 секунд - оптимально для лимитов API
+    }, 45000); 
 
     return () => clearInterval(pollInterval);
   }, [db.timestamp, handleImportData]);
@@ -199,7 +202,7 @@ const App: React.FC = () => {
 
   const addTask = (projectId: number) => {
     const newTask: Task = {
-      id: Date.now(), // Числовой ID для совместимости с текущей схемой
+      id: Date.now(), 
       projectId,
       title: 'Новая задача',
       description: 'Введите описание...',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Github, Download, Upload, RefreshCw, CheckCircle2, CloudLightning, Zap, ShieldAlert, Key } from 'lucide-react';
+import { Database, Github, Download, Upload, RefreshCw, CheckCircle2, CloudLightning, Zap, ShieldAlert, Key, AlertTriangle } from 'lucide-react';
 import { User, GithubConfig, AppSnapshot, APP_VERSION } from '../types.ts';
 import { STORAGE_KEYS } from '../App.tsx';
 
@@ -18,6 +18,7 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
   });
   
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [lastError, setLastError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'applying' | 'done'>('idle');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -33,12 +34,27 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
   };
 
   const fromBase64 = (str: string) => {
-    return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    try {
+      return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    } catch (e) {
+      console.error("Decoding error", e);
+      return str;
+    }
+  };
+
+  const parseGHError = async (res: Response) => {
+    try {
+      const data = await res.json();
+      return data.message || res.statusText;
+    } catch {
+      return res.statusText;
+    }
   };
 
   const handlePushToGithub = async () => {
+    setLastError(null);
     if (!ghConfig.token || !ghConfig.repo.includes('/')) {
-      alert("⚠️ Настройте GitHub доступ внизу страницы");
+      alert("⚠️ Настройте GitHub доступ (owner/repo) и Token внизу страницы");
       setShowAdvanced(true);
       return;
     }
@@ -49,18 +65,28 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
       const contentBase64 = toBase64(JSON.stringify(snapshot, null, 2));
       const url = `https://api.github.com/repos/${ghConfig.repo}/contents/${ghConfig.path}`;
       
+      const commonHeaders = {
+        'Authorization': `Bearer ${ghConfig.token.trim()}`,
+        'Accept': 'application/vnd.github+json'
+      };
+
       let sha = "";
-      const getRes = await fetch(url, { headers: { 'Authorization': `Bearer ${ghConfig.token.trim()}` } });
+      const getRes = await fetch(url, { headers: commonHeaders, cache: 'no-store' });
+      
       if (getRes.ok) {
         const existingFile = await getRes.json();
         sha = existingFile.sha;
+      } else if (getRes.status === 401) {
+        throw new Error("Неверный токен (401 Bad credentials)");
+      } else if (getRes.status === 404 && !getRes.url.includes('contents')) {
+        throw new Error("Репозиторий не найден (404)");
       }
 
       const putRes = await fetch(url, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${ghConfig.token.trim()}`, 'Content-Type': 'application/json' },
+        headers: { ...commonHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: `Update Enterprise DB v${APP_VERSION} [${new Date().toLocaleString()}]`, 
+          message: `Zodchiy Sync v${APP_VERSION} [${new Date().toLocaleString()}]`, 
           content: contentBase64, 
           sha: sha || undefined 
         })
@@ -69,14 +95,18 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
       if (putRes.ok) {
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
-      } else { throw new Error("GitHub rejected the request"); }
+      } else { 
+        const errMsg = await parseGHError(putRes);
+        throw new Error(`GitHub: ${errMsg} (${putRes.status})`);
+      }
     } catch (e: any) {
       setSyncStatus('error');
-      alert(`Ошибка экспорта: ${e.message}`);
+      setLastError(e.message);
     }
   };
 
   const handlePullFromGithub = async () => {
+    setLastError(null);
     if (!ghConfig.token || !ghConfig.repo.includes('/')) {
       alert("⚠️ Настройте GitHub доступ");
       setShowAdvanced(true);
@@ -86,7 +116,13 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
     setSyncStatus('loading');
     try {
       const url = `https://api.github.com/repos/${ghConfig.repo}/contents/${ghConfig.path}`;
-      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${ghConfig.token.trim()}` }, cache: 'no-store' });
+      const response = await fetch(url, { 
+        headers: { 
+          'Authorization': `Bearer ${ghConfig.token.trim()}`,
+          'Accept': 'application/vnd.github+json'
+        }, 
+        cache: 'no-store' 
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -94,23 +130,19 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
         onDataImport(content);
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
-      } else { throw new Error("File not found or access denied"); }
+      } else { 
+        const errMsg = await parseGHError(response);
+        throw new Error(`GitHub: ${errMsg} (${response.status})`);
+      }
     } catch (e: any) {
       setSyncStatus('error');
-      alert(`Ошибка импорта: ${e.message}`);
+      setLastError(e.message);
     }
   };
 
   const handleForceUpdate = async () => {
-    if (!ghConfig.token) {
-      alert("Требуется Personal Access Token");
-      setShowAdvanced(true);
-      return;
-    }
-
     setUpdateStatus('checking');
     try {
-      setUpdateStatus('applying');
       await handlePullFromGithub();
       setUpdateStatus('done');
       setTimeout(() => setUpdateStatus('idle'), 3000);
@@ -143,6 +175,19 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
           </button>
         </div>
       </div>
+
+      {lastError && (
+        <div className="bg-rose-50 border-2 border-rose-100 p-6 rounded-3xl animate-in shake duration-500">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="text-rose-600 shrink-0" size={24} />
+            <div className="text-left">
+              <h5 className="text-xs font-black text-rose-800 uppercase tracking-widest mb-1">Ошибка GitHub API</h5>
+              <p className="text-[11px] font-bold text-rose-600 leading-relaxed">{lastError}</p>
+              <p className="text-[9px] text-rose-400 mt-2 font-medium">Проверьте Token (должен иметь права 'repo') и правильность пути 'user/repo'.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <button 
@@ -194,7 +239,7 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
         {showAdvanced && (
           <div className="mt-6 space-y-4 animate-in slide-in-from-top-2">
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">GitHub Token</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">GitHub Token (Classic или Fine-grained)</label>
               <input 
                 type="password" 
                 value={ghConfig.token} 
@@ -216,7 +261,7 @@ export const BackupManager: React.FC<BackupManagerProps> = ({ currentUser, curre
             <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
               <ShieldAlert size={18} className="text-amber-600 shrink-0" />
               <p className="text-[9px] font-bold text-amber-800 leading-relaxed uppercase">
-                Никогда не передавайте свой токен третьим лицам. Он хранится только в локальной памяти вашего устройства.
+                Для работы экспорта токен должен иметь права доступа к репозиторию (scope: 'repo').
               </p>
             </div>
           </div>
