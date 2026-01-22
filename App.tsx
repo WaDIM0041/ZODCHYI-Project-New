@@ -23,7 +23,8 @@ import {
   Cloud,
   Zap,
   Building2,
-  HardDrive
+  HardDrive,
+  DownloadCloud
 } from 'lucide-react';
 
 export const STORAGE_KEYS = {
@@ -202,6 +203,21 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+  };
+
+  const handleAppUpdate = async () => {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.update();
+        }
+        alert("Проверка обновлений завершена. Приложение будет перезагружено.");
+      } catch (e) {
+        console.error("SW Update failed", e);
+      }
+    }
+    window.location.reload();
   };
 
   const addTask = (projectId: number) => {
@@ -450,9 +466,17 @@ const App: React.FC = () => {
                   <p className="text-lg font-black text-emerald-400 leading-none">{APP_VERSION}</p>
                 </div>
               </div>
+              
+              <button 
+                onClick={handleAppUpdate}
+                className="w-full mt-6 py-4 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                <DownloadCloud size={18} /> Обновить ядро APP
+              </button>
+
               <div className="mt-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
                 <p className="text-[9px] font-bold text-blue-300 leading-tight">
-                  Статус системы: Стабильно. Рекомендуемый вес базы до 2048 КБ для оптимальной работы PWA.
+                  Статус системы: Стабильно. Обновите приложение при обнаружении ошибок или для получения новых функций.
                 </p>
               </div>
             </div>
